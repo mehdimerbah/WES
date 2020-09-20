@@ -1,5 +1,5 @@
 ---
-title: "ma_pipeline"
+title: "Microarray Pipeline"
 author: "Mehdi Merbah"
 date: "9/18/2020"
 output: html_document
@@ -9,11 +9,11 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This is an R Markdown of the Bioconductor packages installation through BiocManager. The following is the output of library loading
+This is an R Markdown of the Bioconductor packages setup through BiocManager. 
 
 ## Loading Packages
 
-
+We load the required packages for the workflow.
 ```{r initiation}
 suppressPackageStartupMessages({library("maEndToEnd")})
 
@@ -60,6 +60,8 @@ suppressPackageStartupMessages({library("maEndToEnd")})
 
 ## Loading ArrayExpress Data
 
+We downloaded Array Express data to a local directory and are loading it from there.
+
 ```{r data_import, echo = FALSE}
 raw_data_dir <-'/home/mehdimerbah/Documents/University/Fall20/Functional Genomics/microarray_data'
 ```
@@ -70,15 +72,15 @@ SDRF <- read.delim(sdrf_location)
 rownames(SDRF) <- SDRF$Array.Data.File
 SDRF <- AnnotatedDataFrame(SDRF)
 
-raw_data <- oligo::read.celfiles(filenames = file.path(raw_data_dir, 
-                                                SDRF$Array.Data.File),
-                                    verbose = FALSE, phenoData = SDRF)
+raw_data <- oligo::read.celfiles(filenames = file.path(raw_data_dir, SDRF$Array.Data.File), verbose = FALSE, phenoData = SDRF)
+
 stopifnot(validObject(raw_data))
 
 
 ```
 
-##Exploring the Data
+## Exploring the Data
+
 ```{r loading_data_head}
 head(Biobase::pData(raw_data))
 ```
@@ -90,6 +92,9 @@ head(Biobase::pData(raw_data))
 ```
 
 ## PCA
+
+Here we perform a principal component analysis.
+
 ```{r PCA}
 exp_raw <- log2(Biobase::exprs(raw_data))
 PCA_raw <- prcomp(t(exp_raw), scale. = FALSE)
@@ -113,5 +118,6 @@ ggplot(dataGG, aes(PC1, PC2)) +
   scale_color_manual(values = c("darkorange2", "dodgerblue4"))
 
 ```
+
 
 
