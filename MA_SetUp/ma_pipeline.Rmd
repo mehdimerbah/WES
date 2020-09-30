@@ -91,12 +91,26 @@ Biobase::pData(raw_data) <- Biobase::pData(raw_data)[, c("Source.Name","Characte
 head(Biobase::pData(raw_data))
 ```
 
-## PCA
+## Quality Control of the data
+After we have imported our raw data from the downloaded sets, the first thing we do is Quality Control (QC). The purpose of quality control is to check for any outliers and if our data clusters as we would expect it to based on the predefined experimental procedures and conditions. 
+Here our rows represent individual probe intensities, while each column represents a single microarray. And so essentially we have 58 columns of both inflamed and non-inflamed mucosa.
 
-Here we perform a principal component analysis.
+```{r raw data head}
+Biobase::exprs(raw_data)[1:3, 1:5]
+```
+
+For quality control purposes, expression data is commonly analyzed on a logarithmic scale.
+```{r log2 of expression}
+exp_raw <- log2(Biobase::exprs(raw_data))
+```
+### Principal Component Analysis
+
+Here we perform a Principal Component Analysis (PCA) and generate a plot using the ggplot2 library .
+
+Notice that we take transpose (using t() function) of the log2-transformed expression data, as the principal component function in R uses rows to indicate samples and columns to indicate variables (probe intensities in this case).
+
 
 ```{r PCA}
-exp_raw <- log2(Biobase::exprs(raw_data))
 PCA_raw <- prcomp(t(exp_raw), scale. = FALSE)
 
 percentVar <- round(100*PCA_raw$sdev^2/sum(PCA_raw$sdev^2),1)
@@ -118,6 +132,576 @@ ggplot(dataGG, aes(PC1, PC2)) +
   scale_color_manual(values = c("darkorange2", "dodgerblue4"))
 
 ```
+The colors in our plot represent the type of tissue (ie. Inflamed and non-inflamed) and the geo-labels represent the type of the disease for each sample.
+
+We could say by analyzing the PCA plot that PC1 separates or differentiates between the disease types (Meaning that there are 2 clusters based on disease type along the first PC.)
+
+This might affect our analysis since we are interested in DGE based on tissue phenotype and not disease type.
+
+NOTE: It is more interesting to calculate the percent deviation for each principal component to see the percent contribution of each component to the overall variation in the data. Essentially the components are ranked in descending order of "Variability Contribution" and so the 2 most contributing components are PC1 and PC2.
+
+The following barplot showcases this: 
+ ```{r percentVar}
+ barplot(percentVar, main ="Scree Plot", xlab = "Principal Component", ylab = "Percent Variation")
+ ```
+
+### Boxplot of log-transformed Data
+We could represent our probe intensities with a boxplot, with one box for each microarray.
+
+```{r Boxplot from Oligo}
+
+oligo::boxplot(raw_data, target = "core", 
+               main = "Boxplot of log2-intensitites for the raw data")
+
+
+```
+Looking at the boxplots we can notice that the intensity distributions for individual arrays are very different and so we need to normalize them. Next section elaborates on normalization.
+
+## Background adjustment, calibration and summarization
+
+### Background Adjustment
+### Across-array normalization
+### Summarization
+
+```{r transcript cluster package}
+
+head(ls("package:hugene10sttranscriptcluster.db"))
+
+```
+### Probesets: Old vs New
+
+Difference between old and new Affymetrix array probesests.
+
+
+NOTE: Newer microarray chips no longer have MM probes that were used for background correction. More elaborate techniques do not require such probes.
+
+## Relative Log Expression data Quality Analysis
+We perform an RMA without normalization
+
+```{r RMA non-norm}
+palmieri_eset <- oligo::rma(raw_data, target = "core", normalize = FALSE)
+
+```
+
+### Relative Log Expression
+```{r RMA}
+row_medians_assayData <- 
+  Biobase::rowMedians(as.matrix(Biobase::exprs(palmieri_eset)))
+
+RLE_data <- sweep(Biobase::exprs(palmieri_eset), 1, row_medians_assayData)
+
+RLE_data <- as.data.frame(RLE_data)
+RLE_data_gathered <- 
+  tidyr::gather(RLE_data, patient_array, log2_expression_deviation)
+
+ggplot2::ggplot(RLE_data_gathered, aes(patient_array,
+                                       log2_expression_deviation)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  ylim(c(-2, 2)) + 
+  theme(axis.text.x = element_text(colour = "aquamarine4", 
+                                  angle = 60, size = 6.5, hjust = 1 ,
+                                  face = "bold"))
+
+```
+
+## RMA Calibration
+Now we run the full RMA Algorithm
+```{r Full RMA}
+palmieri_eset_norm <- oligo::rma(raw_data, target = "core")
+
+```
+
+
+### Quality Assesment of calibrated data using PCA
+```{r PCA Calibrated}
+exp_palmieri <- Biobase::exprs(palmieri_eset_norm)
+PCA <- prcomp(t(exp_palmieri), scale = FALSE)
+
+percentVar <- round(100*PCA$sdev^2/sum(PCA$sdev^2),1)
+sd_ratio <- sqrt(percentVar[2] / percentVar[1])
+
+dataGG <- data.frame(PC1 = PCA$x[,1], PC2 = PCA$x[,2],
+                    Disease = 
+                     Biobase::pData(palmieri_eset_norm)$Factor.Value.disease.,
+                    Phenotype = 
+                     Biobase::pData(palmieri_eset_norm)$Factor.Value.phenotype.)
+
+
+ggplot(dataGG, aes(PC1, PC2)) +
+      geom_point(aes(shape = Disease, colour = Phenotype)) +
+  ggtitle("PCA plot of the calibrated, summarized data") +
+  xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+  ylab(paste0("PC2, VarExp: ", percentVar[2], "%")) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  coord_fixed(ratio = sd_ratio) +
+  scale_shape_manual(values = c(4,15)) + 
+  scale_color_manual(values = c("darkorange2", "dodgerblue4"))
+
+```
+### Heatmap Clustering Analysis
+
+We first set up the variables for the pheatmap function into a dataframe
+
+```{r Heatmap Clustering Setup}
+phenotype_names <- ifelse(str_detect(pData
+                                    (palmieri_eset_norm)$Factor.Value.phenotype.,
+                             "non"), "non_infl.", "infl.")
+
+disease_names <- ifelse(str_detect(pData
+                                    (palmieri_eset_norm)$Factor.Value.disease.,
+                             "Crohn"), "CD", "UC")
+
+annotation_for_heatmap <- 
+  data.frame(Phenotype = phenotype_names,  Disease = disease_names)
+
+row.names(annotation_for_heatmap) <- row.names(pData(palmieri_eset_norm))
+
+```
+
+
+```{r Heatmap Clustering}
+dists <- as.matrix(dist(t(exp_palmieri), method = "manhattan"))
+
+rownames(dists) <- row.names(pData(palmieri_eset_norm))
+hmcol <- rev(colorRampPalette(RColorBrewer::brewer.pal(9, "YlOrRd"))(255))
+colnames(dists) <- NULL
+diag(dists) <- NA
+
+ann_colors <- list(
+  Phenotype = c(non_infl. = "chartreuse4", infl. = "burlywood3"),
+  Disease = c(CD = "blue4", UC = "cadetblue2")
+                   )
+pheatmap(dists, col = (hmcol), 
+         annotation_row = annotation_for_heatmap,
+         annotation_colors = ann_colors,
+         legend = TRUE, 
+         treeheight_row = 0,
+         legend_breaks = c(min(dists, na.rm = TRUE), 
+                         max(dists, na.rm = TRUE)), 
+         legend_labels = (c("small distance", "large distance")),
+         main = "Clustering heatmap for the calibrated samples")
+
+```
+
+## Filtering Based on intensity 
+
+```{r HistoMedians1}
+palmieri_medians <- rowMedians(Biobase::exprs(palmieri_eset_norm))
+
+hist_res <- hist(palmieri_medians, 100, col = "cornsilk1", freq = FALSE, 
+            main = "Histogram of the median intensities", 
+            border = "antiquewhite4",
+            xlab = "Median intensities")
+
+
+
+```
+
+
+```{r HistoMedian2}
+man_threshold <- 4
+
+hist_res <- hist(palmieri_medians, 100, col = "cornsilk", freq = FALSE, 
+            main = "Histogram of the median intensities",
+            border = "antiquewhite4",
+            xlab = "Median intensities")
+
+abline(v = man_threshold, col = "coral4", lwd = 2)
+```
+
+
+```{r Section1}
+no_of_samples <- 
+  table(paste0(pData(palmieri_eset_norm)$Factor.Value.disease., "_", 
+                  pData(palmieri_eset_norm)$Factor.Value.phenotype.))
+no_of_samples 
+
+```
+
+
+
+```{r Section2}
+samples_cutoff <- min(no_of_samples)
+
+idx_man_threshold <- apply(Biobase::exprs(palmieri_eset_norm), 1,
+                           function(x){
+                          sum(x > man_threshold) >= samples_cutoff})
+                          table(idx_man_threshold)
+
+```
+
+```{r palmieri filtered}
+palmieri_manfiltered <- subset(palmieri_eset_norm, idx_man_threshold)
+```
+## Annotating Transcript Clusters
+
+We add feature data to identify which transcript clusters refer to which genes.
+
+```{r Annotation package}
+anno_palmieri <- AnnotationDbi::select(hugene10sttranscriptcluster.db,
+                                  keys = (featureNames(palmieri_manfiltered)),
+                                  columns = c("SYMBOL", "GENENAME"),
+                                  keytype = "PROBEID")
+
+anno_palmieri <- subset(anno_palmieri, !is.na(SYMBOL))
+
+```
+
+
+
+```{r Filtering duplicates}
+anno_grouped <- group_by(anno_palmieri, PROBEID)
+anno_summarized <- 
+  dplyr::summarize(anno_grouped, no_of_matches = n_distinct(SYMBOL))
+
+head(anno_summarized)
+
+```
+```{r filtering}
+anno_filtered <- filter(anno_summarized, no_of_matches > 1)
+
+head(anno_filtered)
+```
+
+```{r filtering2}
+probe_stats <- anno_filtered 
+
+nrow(probe_stats)
+```
+
+```{r Section3}
+ids_to_exlude <- (featureNames(palmieri_manfiltered) %in% probe_stats$PROBEID)
+
+table(ids_to_exlude)
+
+```
+The final expression set is generated, one that doesn't include the excluded identifiers:
+```{r Section4}
+palmieri_final <- subset(palmieri_manfiltered, !ids_to_exlude)
+
+validObject(palmieri_final)
+
+head(anno_palmieri)
+
+```
+
+
+We store feature data from the final expression set:
+```{r Sectionx}
+fData(palmieri_final)$PROBEID <- rownames(fData(palmieri_final))
+
+```
+
+```{r Sectiony}
+
+fData(palmieri_final) <- left_join(fData(palmieri_final), anno_palmieri)
+```
+
+```{r Section5}
+rownames(fData(palmieri_final)) <- fData(palmieri_final)$PROBEID 
+    
+validObject(palmieri_final)
+
+```
+
+
+## Linear Models
+### Linear Models for Microarrays
+### Linear model for our data
+```{r Linear Modeling}
+individual <- 
+  as.character(Biobase::pData(palmieri_final)$Characteristics.individual.)
+
+tissue <- str_replace_all(Biobase::pData(palmieri_final)$Factor.Value.phenotype.,
+                  " ", "_")
+
+tissue <- ifelse(tissue == "non-inflamed_colonic_mucosa",
+                 "nI", "I")
+
+disease <- 
+  str_replace_all(Biobase::pData(palmieri_final)$Factor.Value.disease.,
+                  " ", "_")
+disease <- 
+  ifelse(str_detect(Biobase::pData(palmieri_final)$Factor.Value.disease., 
+                    "Crohn"), "CD", "UC")
+
+```
+
+```{r Section6}
+i_CD <- individual[disease == "CD"]
+design_palmieri_CD <- model.matrix(~ 0 + tissue[disease == "CD"] + i_CD)
+colnames(design_palmieri_CD)[1:2] <- c("I", "nI")
+rownames(design_palmieri_CD) <- i_CD 
+
+i_UC <- individual[disease == "UC"]
+design_palmieri_UC <- model.matrix(~ 0 + tissue[disease == "UC"] + i_UC )
+colnames(design_palmieri_UC)[1:2] <- c("I", "nI")
+rownames(design_palmieri_UC) <- i_UC 
+
+```
+The following are the design matrices:
+
+```{r Section7}
+head(design_palmieri_CD[, 1:6])
+```
+
+```{r Section8}
+head(design_palmieri_UC[, 1:6])
+```
+
+### DGE Analysis based on a single gene
+
+__Fitting the linear model on the CRAT gene__
+
+```{r Section9}
+tissue_CD <- tissue[disease == "CD"]
+crat_expr <- Biobase::exprs(palmieri_final)["8164535", disease == "CD"]
+crat_data <- as.data.frame(crat_expr)
+colnames(crat_data)[1] <- "org_value"
+crat_data <- mutate(crat_data, individual = i_CD, tissue_CD)
+
+crat_data$tissue_CD <- factor(crat_data$tissue_CD, levels = c("nI", "I"))
+
+ggplot(data = crat_data, aes(x = tissue_CD, y = org_value, 
+                             group = individual, color = individual)) +
+      geom_line() +
+      ggtitle("Expression changes for the CRAT gene")
+```
+
+
+
+```{r Section10}
+crat_coef <- lmFit(palmieri_final[,disease == "CD"],
+                design = design_palmieri_CD)$coefficients["8164535",]
+
+crat_coef
+```
+
+
+
+```{r Section11}
+crat_fitted <- design_palmieri_CD %*% crat_coef
+rownames(crat_fitted) <- names(crat_expr)
+colnames(crat_fitted) <- "fitted_value"
+
+crat_fitted
+```
+
+
+
+
+```{r q}
+crat_coef <- lmFit(palmieri_final[,disease == "CD"],
+                design = design_palmieri_CD)$coefficients["8164535",]
+
+crat_coef
+```
+
+
+```{r w}
+crat_fitted <- design_palmieri_CD %*% crat_coef
+rownames(crat_fitted) <- names(crat_expr)
+colnames(crat_fitted) <- "fitted_value"
+
+crat_fitted
+```
+
+```{r e}
+crat_data$fitted_value <- crat_fitted
+
+ggplot(data = crat_data, aes(x = tissue_CD, y = fitted_value, 
+                             group = individual, color = individual)) +
+      geom_line() +
+      ggtitle("Fitted expression changes for the CRAT gene")
+```
+
+__DGE of the CRAT gene__
+
+```{r t}
+crat_noninflamed <- na.exclude(crat_data$org_value[tissue == "nI"])
+crat_inflamed <- na.exclude(crat_data$org_value[tissue == "I"])
+res_t <- t.test(crat_noninflamed ,crat_inflamed , paired = TRUE)
+res_t
+
+
+```
+
+### Hypothesis Testing
+```{r y}
+contrast_matrix_CD <- makeContrasts(I-nI, levels = design_palmieri_CD)
+
+palmieri_fit_CD <- eBayes(contrasts.fit(lmFit(palmieri_final[,disease == "CD"],
+                                design = design_palmieri_CD),
+                                contrast_matrix_CD))
+
+contrast_matrix_UC <- makeContrasts(I-nI, levels = design_palmieri_UC)
+
+palmieri_fit_UC <- eBayes(contrasts.fit(lmFit(palmieri_final[,disease == "UC"],
+                                design = design_palmieri_UC),
+                                contrast_matrix_UC))
+```
+
+### Extracting Results 
+
+```{r u}
+table_CD <- topTable(palmieri_fit_CD, number = Inf)
+head(table_CD)
+```
+
+```{r i}
+hist(table_CD$P.Value, col = brewer.pal(3, name = "Set2")[1],
+     main = "inflamed vs non-inflamed - Crohn's disease", xlab = "p-values")
+```
+
+```{r o}
+table_UC <- topTable(palmieri_fit_UC, number = Inf)
+head(table_UC)
+```
+
+
+```{r p}
+hist(table_UC$P.Value, col = brewer.pal(3, name = "Set2")[2],
+     main = "inflamed vs non-inflamed - Ulcerative colitis", xlab = "p-values")
+```
+
+### Mtiple testing FDR, Results comparison
+
+
+
+```{r a}
+nrow(subset(table_UC, P.Value < 0.001))
+```
+
+
+```{r s}
+tail(subset(table_UC, P.Value < 0.001))
+```
+
+
+```{r d}
+fpath <- system.file("extdata", "palmieri_DE_res.xlsx", package = "maEndToEnd")
+palmieri_DE_res <- sapply(1:4, function(i) read.xlsx(cols = 1, fpath, 
+                                                     sheet = i, startRow = 4))
+
+names(palmieri_DE_res) <- c("CD_UP", "CD_DOWN", "UC_UP", "UC_DOWN")
+palmieri_DE_res <- lapply(palmieri_DE_res, as.character)
+paper_DE_genes_CD <- Reduce("c", palmieri_DE_res[1:2])
+paper_DE_genes_UC <- Reduce("c", palmieri_DE_res[3:4])
+
+overlap_CD <- length(intersect(subset(table_CD, P.Value < 0.001)$SYMBOL,  
+                               paper_DE_genes_CD)) / length(paper_DE_genes_CD)
+
+
+overlap_UC <- length(intersect(subset(table_UC, P.Value < 0.001)$SYMBOL,
+                               paper_DE_genes_UC)) / length(paper_DE_genes_UC)
+overlap_CD
+```
+
+### Volcano Plot and Results Visualization
+
+
+```{r f}
+volcano_names <- ifelse(abs(palmieri_fit_CD$coefficients)>=1, 
+                        palmieri_fit_CD$genes$SYMBOL, NA)
+             
+             
+volcanoplot(palmieri_fit_CD, coef = 1L, style = "p-value", highlight = 100, 
+            names = volcano_names,
+            xlab = "Log2 Fold Change", ylab = NULL, pch=16, cex=0.35)
+```
+
+## Gene Ontology Based Enrichment Analysis
+
+```{r g}
+DE_genes_CD <- subset(table_CD, adj.P.Val < 0.1)$PROBEID
+```
+
+
+
+```{r h}
+back_genes_idx <- genefilter::genefinder(palmieri_final, 
+                                        as.character(DE_genes_CD), 
+                                        method = "manhattan", scale = "none")
+```
+
+
+
+```{r j}
+back_genes_idx <- sapply(back_genes_idx, function(x)x$indices)
+```
+
+
+
+```{r k}
+back_genes <- featureNames(palmieri_final)[back_genes_idx]
+back_genes <- setdiff(back_genes, DE_genes_CD)
+
+    
+intersect(back_genes, DE_genes_CD)
+```
+
+
+```{r l}
+multidensity(list(
+        all = table_CD[,"AveExpr"] ,
+        fore = table_CD[DE_genes_CD , "AveExpr"],
+        back = table_CD[rownames(table_CD) %in% back_genes, "AveExpr"]),
+        col = c("#e46981", "#ae7ee2", "#a7ad4a"),
+     xlab = "mean expression",
+   main = "DE genes for CD-background-matching")
+```
+
+
+### topGO
+
+```{r z}
+gene_IDs <- rownames(table_CD)
+in_universe <- gene_IDs %in% c(DE_genes_CD, back_genes)
+in_selection <- gene_IDs %in% DE_genes_CD 
+
+all_genes <- in_selection[in_universe]
+all_genes <- factor(as.integer(in_selection[in_universe]))
+names(all_genes) <- gene_IDs[in_universe] 
+```
+
+
+
+
+```{r x}
+top_GO_data <- new("topGOdata", ontology = "BP", allGenes = all_genes,
+ nodeSize = 10, annot = annFUN.db, affyLib = "hugene10sttranscriptcluster.db")
+```
+
+
+
+```{r c}
+result_top_GO_elim <- 
+  runTest(top_GO_data, algorithm = "elim", statistic = "Fisher")
+result_top_GO_classic <- 
+  runTest(top_GO_data, algorithm = "classic", statistic = "Fisher")
+```
+
+
+
+```{r v}
+res_top_GO <- GenTable(top_GO_data, Fisher.elim = result_top_GO_elim,
+        Fisher.classic = result_top_GO_classic,
+        orderBy = "Fisher.elim" , topNodes = 100)
+
+genes_top_GO <- printGenes(top_GO_data, whichTerms = res_top_GO$GO.ID,
+    chip = "hugene10sttranscriptcluster.db", geneCutOff = 1000)
+
+res_top_GO$sig_genes <- sapply(genes_top_GO, function(x){
+                str_c(paste0(x[x$'raw p-value' == 2, "Symbol.id"],";"), 
+                      collapse = "")
+    })
+
+head(res_top_GO[,1:8], 20)
+```
+
+### Results Visualization
+
+
 
 
 
