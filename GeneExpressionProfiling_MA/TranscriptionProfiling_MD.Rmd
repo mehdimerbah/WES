@@ -1,0 +1,539 @@
+---
+title: "MA TranscriptionProfiling For HIV and HCV Mono-infected and Co-infected Individuals"
+author: "Mehdi Merbah"
+date: "10/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Abstract of the Study 
+Co-infection with HIV and HCV is very common. It is estimated that over 5 million people are co-infected with HIV and HCV worldwide. Accumulated evidence shows that each virus alters the course of infection of the other one. CD8+ T cells play a crucial role in the eradication of viruses and infected target cells. To the best of our knowledge, no one has investigated the gene expression profiles in HIV/HCV-co-infected individuals.  
+A total of 110, 24 and 72 transcript IDs were shown to be differentially expressed (> 2-fold and p<0.05) in comparisons between HCV- and HIV-mono-infected groups, HIV/HCV-co-infected and HIV-mono-infected groups, and HIV/HCV-co-infected and HCV-mono-infected groups, respectively. In qRT-PCR assay, most of the genes showed similar expressing profiles with the observation in microarray assays. Further analysis revealed that genes involved in cell proliferation, differentiation, transcriptional regulation and cytokine responses were significantly altered. These data offer new insights into HIV/HCV co-infections, and may help to identify new markers for the management and treatment of HIV/HCV co-infections.  
+
+## Our Analysis
+This is essentially a replication of the study. Our analysis however, is going to focus on finding DEGs between HIV and HCV mono-infected individuals only. The paired comparison results are later compared with the findings from the paper and highlighted.
+
+## Loading the R packages
+
+Loading packages
+```{r startup}
+suppressPackageStartupMessages({library("maEndToEnd")})
+```
+
+## Data importing and Storing
+We have already downloaded the data and stored it in a local repository.
+```{r loading data}
+raw_data_dir <-  '/home/mehdimerbah/Documents/Data'
+
+sdrf_location <- file.path(raw_data_dir, "E-MEXP-3635.sdrf.txt")
+
+SDRF <- read.delim(sdrf_location)
+
+rownames(SDRF) <- SDRF$Array.Data.File
+
+SDRF <- AnnotatedDataFrame(SDRF)
+
+raw_data <- oligo::read.celfiles(filenames = file.path(raw_data_dir, SDRF$Array.Data.File),verbose = FALSE, phenoData = SDRF)
+```
+
+
+## Exploring The Data
+We can now see the phenoData from the raw data file.
+```{r}
+head(Biobase::pData(raw_data), 1)
+```
+
+We subselect the columns of interest for us in the dataset. For the purposes of this analysis we will stick to the subjects (Source.Name) and the type of infection (Characteristics.infec.) 
+
+```{r}
+Biobase::pData(raw_data) <- Biobase::pData(raw_data)[, c("Source.Name", "Characteristics.infect.")]
+```
+
+## Wrangling
+We will just transform some of the data into more concise descriptions for the type of infection. \n
+Since we have three types of infections we will access the PhenoData and transform the descriptions (of type string) into acronyms.
+```{r}
+Biobase::pData(raw_data)$Characteristics.infect. <- str_replace_all(Biobase::pData(raw_data)$Characteristics.infect., "hepatitis C virus","HCV")
+
+Biobase::pData(raw_data)$Characteristics.infect. <- str_replace_all(Biobase::pData(raw_data)$Characteristics.infect., "human immunodeficiency virus and hepatitis C virus","HIVHCV")
+
+Biobase::pData(raw_data)$Characteristics.infect. <- str_replace_all(Biobase::pData(raw_data)$Characteristics.infect., "human immunodeficiency virus","HIV")
+```
+
+## Quality Control
+We are now ready to examine the raw expression data and start the quality control.
+After we have imported our raw data from the downloaded sets, the first thing we do is Quality Control (QC). The purpose of quality control is to check for any outliers and if our data clusters as we would expect it to based on the predefined experimental procedures and conditions. 
+Here our rows represent individual probe intensities, while each column represents a single microarray.
+```{r}
+head(Biobase::exprs(raw_data), 5)
+```
+For quality control purposes, expression data is commonly analyzed on a logarithmic scale. We run a PCA on our non transformed raw data and examine the distribution.
+Notice that we take transpose (using t() function) of the log2-transformed expression data, as the principal component function in R uses rows to indicate samples and columns to indicate variables (probe intensities in this case).
+
+```{r}
+exp_raw <- log2(Biobase::exprs(raw_data))
+
+pca <- prcomp(t(exp_raw), scale. = FALSE)
+
+percentVar <- round(100*pca$sdev^2/sum(pca$sdev^2),1)
+
+sd_ratio <- sqrt(percentVar[2] / percentVar[1])
+
+pca_data <- data.frame(PC1 = pca$x[,1], PC2 = pca$x[,2], 
+                       Disease = pData(raw_data)$Characteristics.infect.,
+                    Subject = pData(raw_data)$Source.Name)
+
+ggplot(pca_data, aes(PC1, PC2)) + geom_point(aes(colour = Disease)) +
+  ggtitle("PCA plot of the log-transformed raw expression data") +
+  xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+  ylab(paste0("PC2, VarExp: ", percentVar[2], "%"))
+
+```
+\n The elements show that there is major variability along the first PC, as it accounts for 39.7%. We can notice some sort of clustering of samples from subjects suffering from the same type of infection. 
+The following barplot showcases how the variability is distributed among the different PCs.
+
+```{r}
+barplot(percentVar, main ="Scree Plot", xlab = "Principal Component", ylab = "Percent Variation")
+```
+
+## Boxplot of log2-intensities
+We could represent our probe intensities with a boxplot, with one box for each microarray in order to assess the variability in intensities.
+```{r}
+oligo::boxplot(raw_data, target = "core", 
+               main = "Boxplot of log2-intensitites for the raw data")
+```
+
+## Background adjustment and calibration
+\n __Backgroud Adjustment__  
+
+After we imported the data and did some initial quality assessment, we should now do some background adjustment to account for measured probe intensities that are due to non-specific binding and the noise caused by the optical detection system. 
+All the observed intensities have to be adjusted to give accurate measurments of specific hybridization.  
+
+\n __Across-array normalization__  
+
+For the measurements to be comparable we need to do normalization across all arrays. This is done to account for obscuring sources of variation like different efficiencies of reverse transcription, labeling or hybridization reactions, physical with the array chips, batch effects and experimental lab conditions.  
+
+\n __Summarization__  
+
+We could now use the normalized data to summarize it into individual intensities for single gene transcripts. Transcripts on the affymetrix platform are represented by multiple probes, and hence multiple locations on the array. And so we now have to use the background-adjusted and normalized probe intensities and summarize it into one quantity that estimates and amount proportional to the amount of the RNA transcript.
+
+The summarized data could be annotated with various information like the gene symbols or ENSEMBL gene ids. 
+For our pipeline we could use the hugene10sttranscriptcluster packaged database. This package provides a mapping from the transcript cluster ids to annotation data.
+
+We run the RMA algorithm for Background correction without normalizing the data. 
+```{r}
+bgc_eset <- oligo::rma(raw_data, target = "core", normalize = FALSE)
+```
+
+```{r}
+head(Biobase::exprs(bgc_eset), 5)
+```
+## Relative Log Expression
+We perform RLE by calculating the median log2 intensity of every transcript across all arrays by calculating the row medians.
+We could then use the sweep function to subtract the row medians from every transcript. 
+We plot the data to highlight major differences.
+
+```{r}
+row_medians <- Biobase::rowMedians(as.matrix(Biobase::exprs(bgc_eset)))
+
+RLE_data <- sweep(Biobase::exprs(bgc_eset), 1, row_medians)
+
+RLE_data <- as.data.frame(RLE_data)
+
+head(RLE_data)
+RLE_data_gathered <- tidyr::gather(RLE_data, patient_array, log2_expression_deviation)
+
+ggplot2::ggplot(RLE_data_gathered, aes(patient_array, log2_expression_deviation)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  ylim(c(-2, 2)) + 
+  theme(axis.text.x = element_text(colour = "aquamarine4", 
+                                  angle = 60, size = 6.5, hjust = 1 ,
+                                  face = "bold"))
+```
+
+\n The y-axis here shows the deviation of expression intensity from the median intensity.
+The boxes shifted along the y-direction indicate higher deviation.
+We could mark-out smaples with high deviation and keep them in mind when doing heatmap cluster analysis.
+
+### Full RMA
+We run the full RMA algorithm on our raw data, BG correcting, Normalizing and Summarizing the corrected expression values.
+```{r}
+norm_data <- oligo::rma(raw_data, target = "core")
+```
+The normalized data looks like the following
+```{r}
+head(Biobase::exprs(norm_data), 5)
+```
+### Quality Assesment of calibrated data using PCA
+Now that we have the RMA-calibrated data we could perform another PCA and produce a clustering heatmap.
+This would help us see how normalizing and transforming the data greatly affects the analysis and the kind of insights we could extract.
+
+```{r}
+normalized_exp <- Biobase::exprs(norm_data)
+
+pca <- prcomp(t(normalized_exp), scale. = FALSE)
+
+percentVar <- round(100*pca$sdev^2/sum(pca$sdev^2),1)
+
+sd_ratio <- sqrt(percentVar[2] / percentVar[1])
+
+pca_data <- data.frame(PC1 = pca$x[,1], PC2 = pca$x[,2], 
+                        Disease =  Biobase::pData(norm_data)$Characteristics.infect.,
+                    Subject = pData(raw_data)$Source.Name)
+
+ggplot(pca_data, aes(PC1, PC2), label = TRUE) + geom_point(aes(colour = Disease)) +
+  ggtitle("PCA plot of the log-transformed raw expression data") +
+  xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+  ylab(paste0("PC2, VarExp: ", percentVar[2], "%"))
+
+```
+\n we can see a relatively better grouping of samples with similar types of infection. According to the results of the study HIV mono-infected and HIV/HCV co-infected patients showed similar patterns of expression compared to those mono-infected with HCV. 
+\n The paper results correlate with this similar pattern of variability along the first PC and is in line with the paper's aim to highlight the effect of HIV on expression patterns of HCV in co-infected individuals.
+
+## Heat Map
+We first set up the variables for the pheatmap function into a dataframe.
+```{r}
+infection_type <- pData(norm_data)$Characteristics.infect.
+
+#Heat map wi;; be annotated with the types of infection to help visualize
+annotation_for_heatmap <- data.frame(Infection = infection_type)
+
+row.names(annotation_for_heatmap) <- row.names(pData(norm_data))
+```
+Now we could generate a heatmap to better see the distance differences among the samples and identify clusters.
+```{r}
+dists <- as.matrix(dist(t(normalized_exp)))
+
+rownames(dists) <- row.names(pData(norm_data))
+
+heatmap_col <- rev(colorRampPalette(RColorBrewer::brewer.pal(9, "YlOrRd"))(255))
+
+colnames(dists) <- NULL
+
+diag(dists) <- NA
+
+ann_colors <- list(
+  Infected = c(HIVHCV = "blue4", HIV = "cadetblue2", HCV = "burlywood3"))
+
+pheatmap(dists, col = (heatmap_col), 
+         annotation_row = annotation_for_heatmap,
+         annotation_colors = ann_colors,
+         legend = TRUE, 
+         treeheight_row = 0,
+         legend_breaks = c(min(dists, na.rm = TRUE), 
+                         max(dists, na.rm = TRUE)), 
+         legend_labels = (c("small distance", "large distance")),
+         main = "Clustering heatmap for the calibrated samples")
+```
+
+\n The clustering shows relatively small distances between HIV mono-infected and HIV/HCV co-infected individuals in contrast to HCV mono-infected individuals. 
+\n The following table shows the different expression profiles between the three groups.
+![Expression Patterns](/home/mehdimerbah/Downloads/EP.png)
+\n We can see that HIV mono-infected subjects and co-infected subjects have similar expression patterns and hence low DGE count, which is highlighted by the clustering on the map by very small distances between those samples.
+
+```{r}
+medians <- rowMedians(Biobase::exprs(norm_data))
+
+hist_res <- hist(medians, 100, col = "cornsilk1", freq = FALSE, 
+            main = "Histogram of the median intensities", 
+            border = "antiquewhite4",
+            xlab = "Median intensities")
+
+```
+
+## Filtering low intensity values
+The study did not mention anything about filtering out low intensity probes that have high frequency. So I will leave this for now. I will just highlight a possible cut off value based on the data distribution.
+```{r}
+man_threshold <- 5.6
+
+hist_res <- hist(medians, 100, col = "cornsilk", freq = FALSE, 
+            main = "Histogram of the median intensities",
+            border = "antiquewhite4",
+            xlab = "Median intensities")
+
+abline(v = man_threshold, col = "coral4", lwd = 2)
+```
+
+## Annotation
+We add feature data to identify which transcript clusters refer to which genes.
+```{r}
+annotated_probes <- AnnotationDbi::select(hugene10sttranscriptcluster.db,
+                                  keys = (featureNames(norm_data)),
+                                  columns = c("SYMBOL", "GENENAME"),
+                                  keytype = "PROBEID")
+
+annotated_probes <- subset(annotated_probes, !is.na(SYMBOL))
+
+head(annotated_probes, 5)
+```
+
+## Removing multiple mappings to the same gene
+We now have to remove probesets mapping to multiple genes. And so we see how many matches each probe has with distinct gene symbols.
+```{r}
+grouped_annotations <- group_by(annotated_probes, PROBEID)
+
+summarized_annotations <- dplyr::summarize(grouped_annotations, no_of_matches = n_distinct(SYMBOL))
+
+head(summarized_annotations)
+```
+We only select those who have more than one match per gene by extracting them from the summarized annotation.
+```{r}
+filtered_annotation <- filter(summarized_annotations, no_of_matches > 1)
+head(filtered_annotation)
+```
+Now we have the number of probes that map to multiple genes and their corresponding IDs.
+```{r}
+probe_stats <- filtered_annotation
+nrow(probe_stats)
+```
+We extract the IDs of the probes we want to remove.
+```{r}
+ids_to_exclude <- (featureNames(norm_data) %in% probe_stats$PROBEID)
+
+table(ids_to_exclude)
+```
+And finally generate an expression set with no duplicates.
+```{r}
+filtered_final_eset <- subset(norm_data, !ids_to_exclude)
+validObject(filtered_final_eset)
+head(Biobase::exprs(filtered_final_eset), 3)
+```
+We now add a column to our new Expression Set called PROBEID to match it later with the feature data.
+```{r}
+fData(filtered_final_eset)$PROBEID <- rownames(fData(filtered_final_eset))
+```
+We have to also filter the feature data from the annotated_probes. We use a left-join, which takes the rows and columns from our filtered expression set and adds to it only the corresponding column entries from the annotated_probes, thereby filtering it.
+
+```{r}
+fData(filtered_final_eset) <- left_join(fData(filtered_final_eset), annotated_probes)
+```
+```{r}
+rownames(fData(filtered_final_eset)) <- fData(filtered_final_eset)$PROBEID
+validObject(filtered_final_eset)
+```
+
+## Constructing design matrices
+We now have to construct design matrices for our models. These will serve in t-testing and linear model fitting in the Emperical Bayes
+```{r}
+subjects <- Biobase::pData(filtered_final_eset)$Source.Name
+
+infection <- Biobase::pData(filtered_final_eset)$Characteristics.infect.
+```
+The main design matrix contains dummy variables that will act as our on and off switches in model fitting.
+```{r}
+main_design_mat <- model.matrix(~ 0 + infection)
+rownames(main_design_mat) <- subjects
+colnames(main_design_mat) <- c("HCV", "HIV", "HIVHCV")
+```
+For every subject, the design value matrix 1 corresponds to the type of infection for that subject.
+```{r}
+head(main_design_mat)
+```
+Since we want to compare expression values between pairs of samples we will construct other design matrices accordingly and take data subsets for later analysis. 
+
+```{r}
+design_mat_monoInfected <- main_design_mat[1:6,1:2]
+design_mat_monoInfected
+```
+
+## Analaysis of DGE based on one gene
+We now aim to see expression differences between HIV and HCV infected individuals for a single gene,the EPHA4 gene for EPH receptor A4.
+\n We first extract the expression data from the filtered expression set for EPHA4 and then set it up as a Data Frame. 
+```{r}
+exprs_epha4 <- Biobase::exprs(filtered_final_eset)["8059279",]
+
+epha4_data <- as.data.frame(exprs_epha4)
+
+colnames(epha4_data) <- "Expression"
+
+```
+Our EPHA4 data now has only expression values for now. We use mutate to add the subjects and the type of infection they have.
+```{r}
+colnames(epha4_data)[1] <- "Expression"
+
+epha4_data <- mutate(epha4_data, subject = subjects, infect = infection)
+
+
+ggplot(data = epha4_data, aes(x = infection, y = Expression, 
+                             group = infection, color = subjects)) +
+      geom_bin2d() +
+      ggtitle("Expression changes for the EPHA4 gene")
+```
+\n The results of the study show very different expression patterns in the EPHA4 when comparing HCV  with HIV mono-infected individuals and co-infected ones. The preceding plot highlights this difference in expression.
+\n We can now fit a linear model for EPHA4 expression data. 
+
+```{r}
+epha4_coef <- lmFit(filtered_final_eset,
+                design = main_design_mat)$coefficients["8059279",]
+
+
+epha4_coef
+```
+We can calculate the fitted values by using the coefficient and the design matrix.
+```{r}
+epha4_fitted <- main_design_mat %*% epha4_coef
+```
+```{r}
+epha4_data$fitted_value <- epha4_fitted
+
+
+ggplot(data = epha4_data, aes(x = infection, y = fitted_value, 
+                             group = infection, color = subjects)) +
+      geom_bin2d() +
+      ggtitle("Expression changes for the EPHA4 gene")
+
+
+```
+
+## Contrasts and Hypthesis testing
+We now can find the genes with significant differential expression by creating a contrast matrix and using it in a linear model within Empirical Bayes. 
+```{r}
+contrast_mat <- makeContrasts(HIV-HCV, levels = main_design_mat)
+```
+```{r}
+mono_fit <- eBayes(contrasts.fit(lmFit(filtered_final_eset,
+                                design = main_design_mat),
+                                contrast_mat))
+```
+Generating a table with the deferentially expressed genes.
+```{r}
+table <- topTable(mono_fit, number = Inf)
+head(table, 20)
+```
+The study chose a p-value cut off of 0.05 and a Fold Change cut off of 2. We must filter our data as such and take a subset of the DEGs that match the constraints.
+```{r}
+DEG_table <- subset(table, P.Value < 0.05)
+DEG_table <- subset(DEG_table,  abs(logFC) > 1)
+nrow(DEG_table)
+View(DEG_table)
+```
+
+```{r}
+library(xlsx)
+write.xlsx(DEG_table, file = "DEG_results.xlsx",
+      sheetName = "Differential Gene Expression Mono-Infected", append = FALSE)
+
+```
+We can now see how our p-values are distributed among the DEGs.
+```{r}
+hist(DEG_table$P.Value, col = brewer.pal(3, name = "Set2")[1],
+     main = "HIV vs HCV mono-infected", xlab = "p-values")
+```
+
+A volcano plot helps us see the differentially expressed genes. The plot shows the DEGs on the extremities of the plot, hence DEGs with very low p-values and high fold-change.
+```{r}
+volcano_names <- ifelse(abs(mono_fit$coefficients)>=1, 
+                        mono_fit$genes$SYMBOL, NA)
+             
+             
+volcanoplot(mono_fit, coef = 1L, style = "p-value", highlight = 100, 
+            names = volcano_names,
+            xlab = "Log2 Fold Change", ylab = NULL, pch=16, cex=0.35)
+```
+We import the results provided by the paper and compare the numbers of deferentially expressed genes.
+```{r}
+paper_DEG_data <- read.xlsx("paper_DEGs.XLS",1)
+
+colnames(paper_DEG_data) <- c("TranscriptID", "Gene", "RefSeq.", "P-value", "Fold Change")
+
+head(paper_DEG_data)
+```
+In order to compare the number of DEGs we will load them as lists of either TranscriptIDs or Gene identifiers.
+```{r}
+paper_DEG_list <- paper_DEG_data$Gene
+paper_DEG_list <- paper_DEG_list[!is.na(paper_DEG_list)]
+
+our_DEG_list <- DEG_table$SYMBOL
+our_DEG_list <- our_DEG_list[!is.na(our_DEG_list)]
+```
+We get the ratio of our results to the paper's. Since we removed some NA values, some of the matches got discarded.
+```{r}
+overlap <- length(intersect(our_DEG_list, paper_DEG_list)) / length(paper_DEG_list)
+overlap
+```
+We could just compare by ProbeID. Which makes more sense since we excluded some non annotated (NA) gene symbols.
+```{r}
+paperID_DEG <- paper_DEG_data$TranscriptID
+ourID_DEG <- DEG_table$PROBEID
+ID_overlap <- length(intersect(ourID_DEG, paperID_DEG)) / length(paperID_DEG)
+ID_overlap
+```
+
+## GO Based Enrichement Analysis
+
+```{r}
+DEG_IDs <- DEG_table$PROBEID
+```
+
+
+```{r}
+suppressWarnings(back_genes_idx <- genefilter::genefinder(filtered_final_eset, 
+                                        as.character(DEG_IDs), 
+                                        method = "manhattan", scale = "none"))
+```
+
+```{r}
+back_genes_idx <- sapply(back_genes_idx, function(x)x$indices)
+```
+
+```{r}
+back_genes <- featureNames(filtered_final_eset)[back_genes_idx]
+back_genes <- setdiff(back_genes, DEG_IDs)
+
+    
+intersect(back_genes, DEG_IDs)
+```
+
+```{r}
+gene_IDs <- rownames(DEG_table)
+in_universe <- gene_IDs %in% c(DEG_IDs, back_genes)
+in_selection <- gene_IDs %in% DEG_IDs
+
+all_genes <- in_selection[in_universe]
+all_genes <- factor(as.integer(in_selection[in_universe]))
+names(all_genes) <- gene_IDs[in_universe] 
+```
+
+Error in Loading GeneList all_genes. This has to be a factor with 2 levels. re evaluate the filtering process.
+```{r}
+#top_GO_Enrichement <- top_GO_data <- new("topGOdata", ontology = "BP", allGenes = all_genes, nodeSize = 10, annot = annFUN.db, affyLib = "hugene10sttranscriptcluster.db")
+```
+
+
+
+## Attempted ANOVA Analysis
+
+```{r}
+HIV_eset <- filtered_final_eset[,4:6]
+HIV_df <- as.data.frame(Biobase::exprs(HIV_eset))
+colnames(HIV_df) <- c("HIV", "HIV","HIV")
+HCV_eset <- filtered_final_eset[,1:3]
+HCV_df <- as.data.frame(Biobase::exprs(HCV_eset))
+colnames(HCV_df) <- c("HCV", "HCV","HCV")
+merged <- cbind(HIV_df, HCV_df)
+head(merged)
+```
+
+```{r}
+infection_levels <- gl(2,3,6, label=c("HIV", "HCV"))
+aof <- function(x) {   
+  m <-data.frame(infection_levels, x);   
+  anova(aov(x ~ infection_levels, m)) }
+
+anov_res <- apply(merged,1, aof)
+anov_res[1]
+
+```
+
+```{r}
+pvalues <-data.frame( lapply(anov_res, function(x){x["Pr(>F)"][1,]}))
+pvalues_table <- t(pvalues)
+colnames(pvalues_table) <- "P-Value"
+```
+
+```{r}
+head(pvalues_table)
+```
+Very high p-values. To re-evaluate.
