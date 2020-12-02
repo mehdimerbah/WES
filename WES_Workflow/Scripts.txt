@@ -1,0 +1,16 @@
+FASTQ:
+awk -F ":" '$1=="@HWI-ST330" && $5==1' testfile.txt > filtered.txt
+
+#This Script can be used to filter out bad tiles manually, below is an example only, edit the range + ID 
+grep -P -A 4 '@HWI-D00119:50:H7AP8ADXX:1:(?!1[1-2][0-9][0-9])' sample.fastq
+
+
+
+VCF/BCF:
+
+bcftools view -H my_file.vcf > headerless_file.vcf
+
+awk '$6>=90' headerless_file.vcf > ninety_filt.vcf
+
+
+
