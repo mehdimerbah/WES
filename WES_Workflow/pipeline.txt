@@ -1,0 +1,166 @@
+Whole exome sequencing pipeline:
+
+We first start by check for the base sequencing quality:
+We use FASTQC
+A Quality Control and assessment tool used for evaluating the quality of sequencing products in the FASTQ format.
+Typical header line for every read in the fastq file is:
+
+@<instrument>:<run_number>:<flowcell_ID>:<lane>:<tile>:<x-pos>:<y-pos>  <read>:<is_filtered>:<control_number>:<index>
+
+1:@<instrument>
+2:<run number>
+3:flowcell id
+4:lane
+5:tile
+6:x coor
+7:y coor
+8:read pair member 1/2
+9:filtered or not 1/N
+10:control number
+11:idx sequence
+
+
+We can use Trimmomatic to do various types of trimming based on our experiment.
+
+PE sequencing requires that we supply to files for both the main sequence and the mate.
+
+### java -jar trimmomatic.jar PE -threads 4 FileFor_R1.fastq.gz FileFor_R2.fastq.gz OutFile_R1_paired.fastq.gz OutFile_R1_unpaired.fastq.gz
+OutFile_R2_paired.fastq.gz OutFile_R2_upaired.fastq.gz\
+OPTION1: Arg1 OPTION2: Arg2 
+
+Options:
+MINLEN: Filter out the reads when the length falls below a certain threshold
+ILLUMINACLIP: cut adapters and other illumina-specific sequences.
+
+Now that we have trimmed the adapters our files are ready to be aligned to a refernce genome.
+
+We will use HG38
+to compile and concatenate all chromosomes into a single file we can download them as single files and run:
+
+### tar zvfx hg38.chromFa.tar.gz
+### cat ./chroms/*.fa > hg38.fa
+### rm -r ./chroms
+
+
+Now we align using BWA: Burrows-Wheeler Aligner.
+To align we first need to index the reference genome using the bw transform algorithm.
+
+### bwa index -p hg38bwaidx -a bwtsw hg38.fa
+
+-p refers to the prefix name we want to give the file
+-a refers to the algorithm we want to use (bwt for smith waterman)
+
+### bwa mem -t 8 -R <add_read_Group> reference.fa trimmed_R1.fastq trimmed_R2.fastq > file_to_write_to.sam
+
+
+/--########################################################--/
+
+Now we have a readily usable SAM file. But, sam files are usually very big, so it is much more useful to use BAM files instead.
+
+
+to process the sam file we use SAMTools or Picard/GATK
+
+
+//---------------------USE SAMTOOLS------------------//
+
+Cleanup read pairings:
+
+### samtools fixmate -O bam aligned.sam aligned.bam
+
+To just convert:
+
+
+### samtools view –S –b aligned.sam aligned.bam
+### samtools view –Sb aligned.sam aligned.bam
+
+
+Sorting the map file will help remove unmapped reads:
+
+samtools sort aligned.bam > aligned_sorted.bam
+
+To get a VCF we must first index the genome again (different indexing)
+
+### samtools faidx reference.fa
+
+then use mpileup to get VCF, it summarizes the info in the bam and computed likelihood.
+
+### samtools mpileup -g -f reference.fa aligned_sorted.bam > experiment_raw.bcf
+
+
+Now we call the variants
+
+### bcftools call -vmO x -o experiment_raw.vcf.gz
+
+and then index our file for later use:
+
+tabix -p vcf reference_raw.vcf.gz
+
+
+
+//---------------------USE PICARD------------------//
+
+Validate :
+
+### java -jar picard.jar ValidateSamFile INPUT=aligned.bam MODE=SUMMARY
+
+
+Sort:
+
+### java -jar picard.jar SortSam INPUT=aligned.bam  OUTPUT=aligned_sorted.bam SORT_ORDER=coordinate
+
+
+MarkDuplicates:
+
+### java -jar picard.jar MarkDuplicates INPUT=aligned_sorted.bam OUTPUT=aligned_dup_marked.bam METRICS_FILE=Experiment.metrics
+
+
+
+CreateSequenceDictionary for reference:
+
+### java -jar picard.jar CreateSequenceDictionary
+R=reference.fa
+O=reference.dict
+
+or same with gatk
+
+
+
+BQSR:
+
+BQSR examines four covariates:
+Lane
+Originally reported quality
+Machine cycle (position in the read)
+Sequence context (preceding and subsequent base)
+
+### gatk BaseRecalibrator -I aligned_dup_marked.bam -R reference.fa --known-sites var_sites.vcf -O recalibrated_data.table
+
+### gatk ApplyBQSR -R reference.fa -I aligned_dup_marked.bam --bgsr-recal-file recalibrated_data.table -O outpu_recal.bam
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
