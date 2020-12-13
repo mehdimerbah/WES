@@ -27,3 +27,9 @@ ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30
  bwa mem -t 8 -R "@RG\tID:rg1\tSM:foo" hg38_chr7 forward_paired.fastq.gz reverse_paired.fastq.gz > 392_aln.sam
 
 ```
+
+
+### Generating VCF
+```
+
+```
