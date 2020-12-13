@@ -21,3 +21,9 @@ forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
 ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30
 
 ```
+
+### Read Mapping to Reference Chromosome
+```
+ bwa mem -t 8 -R "@RG\tID:rg1\tSM:foo" hg38_chr7 forward_paired.fastq.gz reverse_paired.fastq.gz > 392_aln.sam
+
+```
