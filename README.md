@@ -49,3 +49,19 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT
 
 ```
 
+**Editing the Read Group Name to add Platform**
+
+```
+java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar AddOrReplaceReadGroups  -I 392_aligned_sorted.bam  -O 392_aligned_sorted_RGcorr.bam  RGID=8  RGLB=lib1  RGPL=ILLUMINA  RGPU=unit1  RGSM=20 
+
+```
+
+**Marking Duplicates on Edited File**
+
+```
+java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted_RGcorr.bam -OUTPUT 392_duplicate_marked.bam -METRICS_FILE markDuplicate_metrics.metrics
+
+```
+**Base Quality Score Recalibration**
+
+
