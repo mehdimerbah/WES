@@ -32,5 +32,20 @@ ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30
 ### Picard Workflow
 **Sam file validation step**
 ```
-java -jar picard.jar ValidateSamFile INPUT=392_aln.bam MODE=SUMMARY 
+java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar ValidateSamFile -INPUT 392_aln.bam -MODE SUMMARY 
+
 ```
+**Sorting the bam file**
+
+```
+java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar SortSam -INPUT 392_aln.bam -OUTPUT 392_aligned_sorted.bam -SORT_ORDER coordinate
+
+```
+
+**Removing Duplicate Reads**
+
+```
+java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted.bam -OUTPUT 392_dup_marked.bam -METRICS_FILE 392_metrics.metrics
+
+```
+
