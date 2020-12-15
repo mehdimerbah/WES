@@ -73,9 +73,27 @@ gatk BaseRecalibrator -I 392_duplicate_marked.bam -R /home/mohamed.mehdi/WholeEx
 gatk ApplyBQSR -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -I 392_duplicate_marked.bam --bqsr-recal-file recalibrated_data.table -O 392_recalibrated.bam 
 ```
 **Second Pass Recalibration**
-`
+```
 gatk BaseRecalibrator -I 392_recalibrated.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa --known-sites /mnt/NGSdata/snpdb151_All_20180418.vcf -O secondPass.table
-`
+```
+**Covariate analysis: Before and After BQSR**
+```
+ gatk AnalyzeCovariates -before recalibrated_data.table -after secondPass.table -plots covAnalysis.pdf
+
+```
+
+**Calling Variants**
+```
+gatk --java-options "-Xmx4g" HaplotypeCaller -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -I 392_recalibrated.bam -O 392_GvarCall.g.vcf.gz -ERC GVCF
+
+```
+
+```
+gatk --java-options "-Xmx4g" GenotypeGVCFs -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_GvarCall.g.vcf.gz -O 392_varCall.vcf.gz
+
+```
+
+
 
 
 
