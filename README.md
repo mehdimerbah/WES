@@ -63,9 +63,19 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT
 
 ```
 **Base Quality Score Recalibration**
+First we build the model:
 ```
-gatk BaseRecalirbrator -I 392_duplicate_marked.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa 
+gatk BaseRecalibrator -I 392_duplicate_marked.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa --known-sites /mnt/NGSdata/snpdb151_All_20180418.vcf -O recalibrated_data.table 
+ 
 ```
+**Applying BQSR**
+```
+gatk ApplyBQSR -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -I 392_duplicate_marked.bam --bqsr-recal-file recalibrated_data.table -O 392_recalibrated.bam 
+```
+**Second Pass Recalibration**
+`
+gatk BaseRecalibrator -I 392_recalibrated.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa --known-sites /mnt/NGSdata/snpdb151_All_20180418.vcf -O secondPass.table
+`
 
 
 
