@@ -63,5 +63,9 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT
 
 ```
 **Base Quality Score Recalibration**
+```
+gatk BaseRecalirbrator -I 392_duplicate_marked.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa 
+```
+
 
 
