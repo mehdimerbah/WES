@@ -124,7 +124,7 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar AddOrReplaceReadGroup
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted_RGcorr.bam -OUTPUT 392_duplicate_marked.bam -METRICS_FILE markDuplicate_metrics.metrics
 
 ```
-### GATK
+### Data Recalibration
 
 **Base Quality Score Recalibration**
 First we build the model:
@@ -144,9 +144,10 @@ gatk BaseRecalibrator -I 392_recalibrated.bam -R /home/mohamed.mehdi/WholeExomeP
 ```
  gatk AnalyzeCovariates -before recalibrated_data.table -after secondPass.table -plots covAnalysis.pdf
 
-```
+```   
+<img src="/WES_Workflow/images/CoVariates.png"  width="1024" height="520">
 
-**Calling Variants**
+### Variant Calling
 ```
 gatk --java-options "-Xmx4g" HaplotypeCaller -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -I 392_recalibrated.bam -O 392_GvarCall.g.vcf.gz -ERC GVCF
 
@@ -172,14 +173,8 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 
 ```
 
-<img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520" class="center">
+<img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520">
 
-.center {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 50%;
-}
 
 
 
