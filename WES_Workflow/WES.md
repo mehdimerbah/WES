@@ -64,7 +64,8 @@ In running `trimmomatic` I used mainly 2 trimming options:
       
 `MINELN`: a minimum read length of 36 for all the reads after trimming. I chose to stick with 36 as a baseline minimum length so as not to eliminate possibly good reads.
 
-**Post-Trimming Stats**
+**Post-Trimming Stats**  
+We can see that the read lengths are no longer all 151. in accordance with our trimming arguments, minimum read length allowed is 36.  
 ![Image of Stats](/WES_Workflow/images/PostTrimming.png "PostTrim")
 
 ### Read Mapping to Reference Chromosome
