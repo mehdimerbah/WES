@@ -187,12 +187,12 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 | ID | Stats |
 | ------ | ------ |
 | Number of mapped reads | 8371923 (13.4%)  |  
-| Avg Mapping Quality| 25. |
-| Number of Supplementary Reads | |
-| Number of Secondary Reads | |
-| Number of Reads with no Indels | |
+| Avg Mapping Quality| 25.52 |
+| Number of Supplementary Reads | 670477 |
+| Number of Secondary Reads | 0 |
+| Number of Reads with no Indels |  |
 | Number of Reads Without Pair Complement | |
-| Number of Duplicates | |
+| Number of Duplicates | 1296614 |
 
 
 ` samtools view -c -F 0x04 392_aligned_sorted.bam `
