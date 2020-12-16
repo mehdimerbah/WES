@@ -166,7 +166,7 @@ gatk --java-options "-Xmx4g" GenotypeGVCFs -R /home/mohamed.mehdi/WholeExomeProj
  
 
 **Filtering the Variants**  
-Filtering the variants based on certain criteria. //Add options justification.
+Filtering the variants based on certain criteria. The options for the command are the ones suggested in the standard pipeline.
 ```
 gatk --java-options "-Xms5g -Xmx15g" VariantFiltration -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall.vcf.gz -O 392_varCall_filtered.vcf.gz --filter-name "lowGQ"     --filter-expression "GQ < 20.0"     --filter-name "lowMQ"     --filter-expression "MQ < 40.0"     --filter-name 'lowQD'  --filter-expression "QD < 2.0"     --filter-name "lowMQRankSum"     --filter-expression "MQRankSum < -12.5" 
 
@@ -179,6 +179,9 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 ```
 
 <img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520">
+
+**Variant Annotation**  
+Variant annotation was not finished due to a problem with loading the hg38 snp database.
 
 
 ### General Stats  
@@ -193,5 +196,15 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 | Number of Reads with no Indels | 61300855 |
 | Number of INDELs | 7203 |
 | Number of SNPs | 122768 |
+
+
+#### Tools Used:
+`fastqc v 0.11.9` 
+`bwa v 0.7.17`
+`samtools v 1.4`
+`bcftools v 1.4`
+`GATK v 4.1.9.0`
+`snpEff v 4.3`
+
 
 
