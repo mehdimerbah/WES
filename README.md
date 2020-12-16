@@ -92,8 +92,18 @@ gatk --java-options "-Xmx4g" HaplotypeCaller -R /home/mohamed.mehdi/WholeExomePr
 gatk --java-options "-Xmx4g" GenotypeGVCFs -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_GvarCall.g.vcf.gz -O 392_varCall.vcf.gz
 
 ```
+**Filtering the Variants**
 
+```
+gatk --java-options "-Xms5g -Xmx15g" VariantFiltration -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall.vcf.gz -O 392_varCall_filtered.vcf.gz --filter-name "lowGQ"     --filter-expression "GQ < 20.0"     --filter-name "lowMQ"     --filter-expression "MQ < 40.0"     --filter-name 'lowQD'  --filter-expression "QD < 2.0"     --filter-name "lowMQRankSum"     --filter-expression "MQRankSum < -12.5" 
 
+```
+**Selecting the Variants**
+
+```
+gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall_filtered.vcf.gz -O 392_varCall_filteredExcluded_nonVar.vcf.gz --exclude-filtered true --exclude-non-variants true 
+
+```
 
 
 
