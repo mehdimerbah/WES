@@ -36,7 +36,7 @@ I first assumed that Nextera-PE adapters were used but another pass of FastQC on
 ```
 java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_paried.fastq.gz \
 forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
-ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:10:30 MINLEN:36
+ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:10:30 MINLEN:50
 
 ```
 //INSERT ADAPTERS TRIM 1
@@ -48,27 +48,36 @@ And so I did a second trimming pass with the TruSeqPE adapters as a referce adap
 ```
 java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_paried.fastq.gz \
 forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
-ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30 MINLEN:36
+ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30 MINLEN:50
 
 ```
-INSERT ADAPTERS TRIM 2
+//INSERT ADAPTERS TRIM 2
 
 
-**Trimmomatic Options and Arguments**
-In running `trimmomatic` I used mainly 2 trimming options:
+**Trimmomatic Options and Arguments**  
+In running `trimmomatic` I used mainly 2 trimming options:  
 `ILLUMINACLIP`: This is to trim the adapter sequences given the TruSeq3 adapter fasta file. This in itself specifies the following column sperated arguments:
-`fasatAdapters`: The fasta file with adapters
-`seedMismatches`:
-`palindromeClipThreshold`:
-`simpleClipThreshold`:
+- `fasatAdapters`: The fasta file with adapters
+- `seedMismatches`:
+- `palindromeClipThreshold`:
+- `simpleClipThreshold`:
+      
+`MINELN`: a minimum read length of 50 for all the reads after trimming.
 
 ### Read Mapping to Reference Chromosome
 We now can safely map our reads back into a reference genome, in our case we will b using Chromosome 7 of hg38. The chromosome fasta files had been concatinated.
-To use it the reference we have to index it using `bwa` that uses the *Burrows Wheeler Transform* and Smith Waterman
+To use it the reference we have to index it using `bwa index` that uses the *Burrows Wheeler Transform* and *Smith Waterman* specified in the `-a` algorithm argument.    
+`bwa index -p hg38_chr7 -a bwtsw hg38_chrom7.fa`   
+Now we are ready to align our reads to the reference chromosome. For the RG argument, I basically used a dummy read group as I do not know about the experiment run cycles, but it would have been better to atleast specify the platform.  
+
 ```
  bwa mem -t 8 -R "@RG\tID:rg1\tSM:foo" hg38_chr7 forward_paired.fastq.gz reverse_paired.fastq.gz > 392_aln.sam
 
-```
+```    
+We generate a SAM file, but it is more useful and less space consuming to work with binary formats and so we convert it. and so we use the fixmate function from `samtools` to convert and adjust the reads.    
+`samtools fixmate -O bam aligned.sam aligned.bam`
+
+
 > The subsequent data processing steps will be done using Picard and GATK according to the best practices outlined in the documentation.
 
 ### Picard Workflow
