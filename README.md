@@ -1,9 +1,9 @@
 # Functional Genomics
-## Gene Expression Profiling
-Study for GEP Project: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0045200
-
-## Whole Exome Sequencing
-This project aims to construct a full pipeline for the identificationa and annotation of genetics variants given Paired End sequencing data: `392_1.fastq.gz` and `392_2.fastq.gz` as the forward and reverse reads respectively.
+## Gene Expression Profiling Project
+Study for GEP Project [HCV-HIV](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0045200
+)
+## Whole Exome Sequencing Project
+This project aims to construct a full pipeline for the identification and annotation of genetics variants given Paired End sequencing data: `392_1.fastq.gz` and `392_2.fastq.gz` as the forward and reverse reads respectively.
 ### Basic File Exploration
 From the file we could first notice that the file uses Phred33 character encoding for the quality scores and so we can conclude that the Illumina version used must be v 1.8 or later.
 
@@ -38,7 +38,7 @@ I first assumed that Nextera-PE adapters were used but another pass of FastQC on
 ```
 java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_paried.fastq.gz \
 forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
-ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:10:30 MINLEN:50
+ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:30:10 MINLEN:36
 
 ```   
 ![Image](/WES_Workflow/images/AdaptersTrim1.png "AT1")
@@ -51,7 +51,7 @@ And so I did a second trimming pass with the TruSeqPE adapters as a referce adap
 ```
 java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_paried.fastq.gz \
 forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
-ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30 MINLEN:50
+ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:30:10 MINLEN:36
 
 ```
 ![Image](/WES_Workflow/images/AT2.png "AT2")
@@ -60,12 +60,12 @@ ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30 MINLEN:50
 **Trimmomatic Options and Arguments**  
 In running `trimmomatic` I used mainly 2 trimming options:  
 `ILLUMINACLIP`: This is to trim the adapter sequences given the TruSeq3 adapter fasta file. This in itself specifies the following column sperated arguments:
-- `fasatAdapters`: The fasta file with adapters
-- `seedMismatches`:
-- `palindromeClipThreshold`:
-- `simpleClipThreshold`:
+- `fastaAdapters`: The fasta file with adapters
+- `seedMismatches`: Looking for matches to the adapter sequence and allowing only 2 mismatches in the seed.
+- `palindromeClipThreshold`: threshold score for alignment of palindromic matches to adapter sequences. I picked 30 as recommended by Trimmomatic docs.
+- `simpleClipThreshold`: threshold for simple matching. usually between 7 and 15 are recommended so I took 10 as an average.
       
-`MINELN`: a minimum read length of 50 for all the reads after trimming.
+`MINELN`: a minimum read length of 36 for all the reads after trimming. I chose to stick with 36 as a baseline minimum length so as not to eliminate possibly good reads.
 
 ### Read Mapping to Reference Chromosome
 We now can safely map our reads back into a reference genome, in our case we will b using Chromosome 7 of hg38. The chromosome fasta files had been concatinated.
@@ -122,6 +122,8 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar AddOrReplaceReadGroup
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted_RGcorr.bam -OUTPUT 392_duplicate_marked.bam -METRICS_FILE markDuplicate_metrics.metrics
 
 ```
+### GATK
+
 **Base Quality Score Recalibration**
 First we build the model:
 ```
