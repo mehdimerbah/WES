@@ -46,7 +46,6 @@ ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:30:10 MINLEN:36
 ![Image](/WES_Workflow/images/AdaptersTrim1.png "AT1")
 
 
-
 And so I did a second trimming pass with the TruSeqPE adapters as a referce adapter file and managed to eliminate a big portion of the adapters. This did leave a small percentage of adapter content but FastQC report validated this as passable so I carried on with the analysis. 
 
 
@@ -86,7 +85,7 @@ We generate a SAM file, but it is more useful and less space consuming to work w
 > The subsequent data processing steps will be done using Picard and GATK according to the best practices outlined in the documentation.
 
 ### Picard Workflow
-**Sam file validation step**
+**Sam File Validation**   
 To make sure we have no issues in our alignment map files, we pass them through a validation step using `picard`.
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar ValidateSamFile -INPUT 392_aln.bam -MODE SUMMARY 
@@ -94,7 +93,7 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar ValidateSamFile -INPU
 ```
 We have a single warning regarding the ReadGroup information as we had not specified the sequencing platform (Illumina) information in the alignment step. This could be easily corrected later on.
 
-**Sorting the bam file**
+**Sorting the BAM File**  
 It is important to sort the bam file. First the read alignments are sorted by the reference sequence name (RNAME) field using the reference sequence dictionary. These are then sorted according to mapping position
 
 ```
@@ -102,7 +101,7 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar SortSam -INPUT 392_al
 
 ```
 
-**Removing Duplicate Reads**
+**Removing Duplicate Reads**  
 Removing PCR duplicates and optical contaminants.
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted.bam -OUTPUT 392_dup_marked.bam -METRICS_FILE 392_metrics.metrics
@@ -110,7 +109,7 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT
 ```
 The input here is simply our sorted bam file and we get a deduplicated bam file.
 
-**Editing the Read Group Name to add Platform**
+**Editing the Read Group Name to add Platform**  
 
 Since we had an error previously regarding the read group, it is important to edit it so as to avoid errors later on with data recalibration. I had not noticed that I did not do this before Marking the duplicates and this had caused me some trouble when doing the BQSR. 
 
@@ -119,7 +118,7 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar AddOrReplaceReadGroup
 
 ```
 
-**Marking Duplicates on Edited File**
+**Marking Duplicates on Edited File**  
 
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted_RGcorr.bam -OUTPUT 392_duplicate_marked.bam -METRICS_FILE markDuplicate_metrics.metrics
@@ -127,23 +126,23 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT
 ```
 ### Data Recalibration
 
-**Base Quality Score Recalibration**
+**Base Quality Score Recalibration**  
 First we build the BQSR model based on our data. This would give us a table that we could use to do the acual recalibration with `ApplyBQSR`.
 ```
 gatk BaseRecalibrator -I 392_duplicate_marked.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa --known-sites /mnt/NGSdata/snpdb151_All_20180418.vcf -O recalibrated_data.table 
  
 ```
-**Applying BQSR**
+**Applying BQSR**  
 Now that we have built the model, we simply do the BQSR.
 ```
 gatk ApplyBQSR -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -I 392_duplicate_marked.bam --bqsr-recal-file recalibrated_data.table -O 392_recalibrated.bam 
 ```
-**Second Pass Recalibration**
+**Second Pass Recalibration**  
 To compare the data before and after doing the recalibration let's generate another table with a second bass of BQSR on our recalibrated data.
 ```
 gatk BaseRecalibrator -I 392_recalibrated.bam -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa --known-sites /mnt/NGSdata/snpdb151_All_20180418.vcf -O secondPass.table
 ```
-**Covariate analysis: Before and After BQSR**
+**Covariate Analysis: Before and After BQSR**  
 Using the two tables we have we can do a co-variate analysis to see how our base substitution data varies.
 ```
  gatk AnalyzeCovariates -before recalibrated_data.table -after secondPass.table -plots covAnalysis.pdf
@@ -151,7 +150,7 @@ Using the two tables we have we can do a co-variate analysis to see how our base
 ```   
 <img src="/WES_Workflow/images/CoVariates.png"  width="1024" height="520">
 
-### Variant Calling
+### Variant Calling  
 Our processing steps are done and we have analysis ready files. We can do variant calling using GATK through two steps:
 1. `HaplotypeCaller`
 ```
@@ -168,13 +167,13 @@ gatk --java-options "-Xmx4g" GenotypeGVCFs -R /home/mohamed.mehdi/WholeExomeProj
  <img src="/WES_Workflow/images/Types_of_Variants.pie.png"  width="520" height="520">
  
 
-**Filtering the Variants**
+**Filtering the Variants**  
 Filtering the variants based on certain criteria. //Add options justification.
 ```
 gatk --java-options "-Xms5g -Xmx15g" VariantFiltration -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall.vcf.gz -O 392_varCall_filtered.vcf.gz --filter-name "lowGQ"     --filter-expression "GQ < 20.0"     --filter-name "lowMQ"     --filter-expression "MQ < 40.0"     --filter-name 'lowQD'  --filter-expression "QD < 2.0"     --filter-name "lowMQRankSum"     --filter-expression "MQRankSum < -12.5" 
 
 ```
-**Selecting the Variants**
+**Selecting the Variants**  
 We filter out INDELs and keep the SNPs only.
 ```
 gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall_filtered.vcf.gz -O 392_varCall_filteredExcluded_nonVar.vcf.gz --exclude-filtered true --exclude-non-variants true 
@@ -184,5 +183,18 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 <img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520">
 
 
+### General Stats  
+| ID | Stats |
+| ------ | ------ |
+| Number of mapped reads | 8371923 (13.4%)  |  
+| Avg Mapping Quality| 25. |
+| Number of Supplementary Reads | |
+| Number of Secondary Reads | |
+| Number of Reads with no Indels | |
+| Number of Reads Without Pair Complement | |
+| Number of Duplicates | |
 
 
+` samtools view -c -F 0x04 392_aligned_sorted.bam `
+
+` samtools view -c -F 0x10 392_aligned_sorted.bam ` 
