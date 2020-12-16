@@ -190,7 +190,7 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 | Avg Mapping Quality| 25.5262 |
 | Number of Supplementary Reads | 670477 |
 | Number of Secondary Reads | 0 |
-| Number of Reads Without Pair Complement | |
+| Number of Reads Without Pair Complement | 58186023 |
 | Number of Duplicates | 1296614 |
 | Number of Reads with no Indels | 61300855 |
 | Number of INDELs | 7203 |
