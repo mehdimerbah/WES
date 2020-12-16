@@ -19,6 +19,7 @@ From an overall view of both fastq files, it seems that the quality of the reads
 ### Quality Control and Assessment
 We will use FastQC to assess the quality of the data and generate our quality reports.
 
+
 ```
 fastqc 392_1.fastq.gz
 fastqc 392_2.fastq.gz
@@ -27,8 +28,9 @@ fastqc 392_2.fastq.gz
 
 ![Image of Stats](/WES_Workflow/images/BasicStats.png "Basic Stats")
 
-
-
+**Per Tile Quality**  
+The per tile sequence quality is really good and so there are no specific tile reads to remove.  
+![Tiles](/WES_Workflow/images/Tiles.png "Tiles")
 
 ### Trimming
 To make sure we are only working with the pure exome data, we need to trim the adapters that were used in the sequencing procedure. 
@@ -154,6 +156,8 @@ gatk --java-options "-Xmx4g" HaplotypeCaller -R /home/mohamed.mehdi/WholeExomePr
 gatk --java-options "-Xmx4g" GenotypeGVCFs -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_GvarCall.g.vcf.gz -O 392_varCall.vcf.gz
 
 ```
+ 
+ ![Vars](/WES_Workflow/images/Types_of_Variants.pie.png "Variants")
 **Filtering the Variants**
 
 ```
@@ -164,6 +168,8 @@ gatk --java-options "-Xms5g -Xmx15g" VariantFiltration -R /home/mohamed.mehdi/Wh
 
 ```
 gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall_filtered.vcf.gz -O 392_varCall_filteredExcluded_nonVar.vcf.gz --exclude-filtered true --exclude-non-variants true 
+
+![FilteredOutIndels](/WES_Workflow/images/Types_of_Variants_Excluded.pie.png "ExcludedIndels")
 
 ```
 
