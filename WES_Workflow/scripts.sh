@@ -17,7 +17,7 @@ samtools view -F 0x04 392_aln.bam | awk '{s+=$5} END {print "Avg Quality: ", s/N
 #Avg Quality:  25.5262
 
 
-################## No Indel Reads ####################
+################### Reads w/o Indels ####################
 
 #Reads with no insertions or deletions:
 
@@ -25,8 +25,19 @@ samtools view 392_aligned_sorted_RGcorr.bam | cut -f 6 | awk  '{if($0 !~ /[ID]/)
 
 #No Ins or Del: 61300855
 
+#################### Mapped Reads ########################
+samtools view -c -F 0x04 392_aligned_sorted.bam 
 
-######################### VCF/BCF ####################
+############### Non Reverse Complemented Reads #################
+samtools view -c -F 0x10 392_aligned_sorted.bam 
+
+############### Secondary Reads ##########################
+samtools view -c -f 0x100 392_aligned_sorted.bam
+
+######################### VCF/BCF ########################
+
+
+bcftools stats 392_varCall_filtered.vcf.gz
 
 
 
