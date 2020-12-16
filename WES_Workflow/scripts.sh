@@ -28,11 +28,14 @@ samtools view 392_aligned_sorted_RGcorr.bam | cut -f 6 | awk  '{if($0 !~ /[ID]/)
 #################### Mapped Reads ########################
 samtools view -c -F 0x04 392_aligned_sorted.bam 
 
-############### Non Reverse Complemented Reads #################
+############### Non Reverse Complemented Reads ###########
 samtools view -c -F 0x10 392_aligned_sorted.bam 
 
 ############### Secondary Reads ##########################
 samtools view -c -f 0x100 392_aligned_sorted.bam
+
+############### Supplementary Reads ######################
+samtools view -c -f 0x800 392_aligned_sorted.bam
 
 ######################### VCF/BCF ########################
 
