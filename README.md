@@ -172,6 +172,7 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 ```
 
 ![FilteredOutIndels](/WES_Workflow/images/Types_of_Variants_Excluded.pie.png "ExcludedIndels")
+<img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520">
 
 
 
