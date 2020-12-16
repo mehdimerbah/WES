@@ -3,26 +3,68 @@
 Study for GEP Project: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0045200
 
 ## Whole Exome Sequencing
+This project aims to construct a full pipeline for the identificationa and annotation of genetics variants given Paired End sequencing data: `392_1.fastq.gz` and `392_2.fastq.gz` as the forward and reverse reads respectively.
+### Basic File Exploration
+From the file we could first notice that the file uses Phred33 character encoding for the quality scores and so we can conclude that the Illumina version used must be v 1.8 or later.
 
+`@A00721:81:HNLHYDSXX:1:1101:24361:1877 1:N:0:GCCGGACA+TGTAAGAG`
+
+`+`
+
+`CCTCCCACCTCAGGTCTGTGTTCATGCTCTTTTATCCCCATAACTAAAACTCTCTTCAAACT`
+
+`::FF,FF,,,,FFF,FFF:FF:FFFF,FF:FFF,F,,:F,:,F:,,,::,FFF:F,,,F,,,`
+
+From an overall view of both fastq files, it seems that the quality of the reads is very good with an average score well above 36. The subsequebt quality assessment steps should confirm this.
 ### Quality Control and Assessment
+We will use FastQC to assess the quality of the data and generate our quality reports.
 
 ```
 fastqc 392_1.fastq.gz
 fastqc 392_2.fastq.gz
 ```
+**Basic Statistics**
+
 
 
 
 ### Trimming
+To make sure we are only working with the pure exome data, we need to trim the adapters that were used in the sequencing procedure. 
+We don't know anything about the experimental protocol used to generate the data and so we have no information about the type type of adapters that hybridized to our DNA fragments. 
+
+I first assumed that Nextera-PE adapters were used but another pass of FastQC on the trimmed data revealed that the adapters were still present. Adapters that remained were Illumina Universal Adapters.
+```
+java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_paried.fastq.gz \
+forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
+ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:10:30 MINLEN:36
+
+```
+//INSERT ADAPTERS TRIM 1
+
+
+And so I did a second trimming pass with the TruSeqPE adapters as a referce adapter file and managed to eliminate a big portion of the adapters.
+
 
 ```
 java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_paried.fastq.gz \
 forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
-ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30
+ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30 MINLEN:36
 
 ```
+INSERT ADAPTERS TRIM 2
+
+
+**Trimmomatic Options and Arguments**
+In running `trimmomatic` I used mainly 2 trimming options:
+`ILLUMINACLIP`: This is to trim the adapter sequences given the TruSeq3 adapter fasta file. This in itself specifies the following column sperated arguments:
+`fasatAdapters`: The fasta file with adapters
+`seedMismatches`:
+`palindromeClipThreshold`:
+`simpleClipThreshold`:
 
 ### Read Mapping to Reference Chromosome
+We now can safely map our reads back into a reference genome, in our case we will b using Chromosome 7 of hg38. The chromosome fasta files had been concatinated.
+To use it the reference we have to index it using `bwa` that uses the *Burrows Wheeler Transform* and Smith Waterman
 ```
  bwa mem -t 8 -R "@RG\tID:rg1\tSM:foo" hg38_chr7 forward_paired.fastq.gz reverse_paired.fastq.gz > 392_aln.sam
 
@@ -31,11 +73,15 @@ ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30
 
 ### Picard Workflow
 **Sam file validation step**
+To make sure we have no issues in our alignment map files, we pass them through a validation step using `picard`.
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar ValidateSamFile -INPUT 392_aln.bam -MODE SUMMARY 
 
 ```
+We have a single warning regarding the ReadGroup information as we had not specified the sequencing platform (Illumina) information in the alignment step. This could be easily corrected later on.
+
 **Sorting the bam file**
+
 
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar SortSam -INPUT 392_aln.bam -OUTPUT 392_aligned_sorted.bam -SORT_ORDER coordinate
@@ -43,13 +89,15 @@ java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar SortSam -INPUT 392_al
 ```
 
 **Removing Duplicate Reads**
-
+Removing PCR duplicates and optical contaminants.
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar MarkDuplicates -INPUT 392_aligned_sorted.bam -OUTPUT 392_dup_marked.bam -METRICS_FILE 392_metrics.metrics
 
 ```
 
 **Editing the Read Group Name to add Platform**
+
+Since we had an error previously regarding the read group, it is important to edit it now so as to avoid errors later on. I had not noticed that I did not do this before Marking the duplicates and so I will do it now. It is also possible to edit read group information on the deduplicated bam file, but it was actually faster 
 
 ```
 java -jar /home/mohamed.mehdi/picard/build/libs/picard.jar AddOrReplaceReadGroups  -I 392_aligned_sorted.bam  -O 392_aligned_sorted_RGcorr.bam  RGID=8  RGLB=lib1  RGPL=ILLUMINA  RGPU=unit1  RGSM=20 
