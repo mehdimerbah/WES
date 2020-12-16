@@ -80,7 +80,7 @@ Now we are ready to align our reads to the reference chromosome. For the RG argu
 
 ```    
 We generate a SAM file, but it is more useful and less space consuming to work with binary formats and so we convert it. and so we use the fixmate function from `samtools` to convert and adjust the reads.    
-`samtools fixmate -O bam aligned.sam aligned.bam`
+`samtools fixmate -O bam 392_aln.sam 392_aln.bam`
 
 
 > The subsequent data processing steps will be done using Picard and GATK according to the best practices outlined in the documentation.
