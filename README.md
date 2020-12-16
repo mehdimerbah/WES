@@ -157,7 +157,8 @@ gatk --java-options "-Xmx4g" GenotypeGVCFs -R /home/mohamed.mehdi/WholeExomeProj
 
 ```
  
- ![Vars](/WES_Workflow/images/Types_of_Variants.pie.png "Variants")
+ <img src="/WES_Workflow/images/Types_of_Variants.pie.png"  width="520" height="520">
+ 
 **Filtering the Variants**
 
 ```
@@ -171,7 +172,6 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 
 ```
 
-![FilteredOutIndels](/WES_Workflow/images/Types_of_Variants_Excluded.pie.png "ExcludedIndels")
 <img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520">
 
 
