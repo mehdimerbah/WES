@@ -169,9 +169,9 @@ gatk --java-options "-Xms5g -Xmx15g" VariantFiltration -R /home/mohamed.mehdi/Wh
 ```
 gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/WholeExomeProject/chrom7/hg38_chr7.fa -V 392_varCall_filtered.vcf.gz -O 392_varCall_filteredExcluded_nonVar.vcf.gz --exclude-filtered true --exclude-non-variants true 
 
-![FilteredOutIndels](/WES_Workflow/images/Types_of_Variants_Excluded.pie.png "ExcludedIndels")
-
 ```
+
+![FilteredOutIndels](/WES_Workflow/images/Types_of_Variants_Excluded.pie.png "ExcludedIndels" =520x520)
 
 
 
