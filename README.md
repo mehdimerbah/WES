@@ -23,7 +23,9 @@ We will use FastQC to assess the quality of the data and generate our quality re
 fastqc 392_1.fastq.gz
 fastqc 392_2.fastq.gz
 ```
-**Basic Statistics**
+**Basic Statistics**  
+
+![Image of Stats](/WES_Workflow/images/BasicStats.png "Basic Stats")
 
 
 
@@ -38,11 +40,12 @@ java -jar trimmomatic.jar PE -threads 4 392_1.fastq.gz 392_2.fastq.gz forward_pa
 forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
 ILLUMINACLIP:/Trimmomatic/adapters/NexteraPE-PE.fa:2:10:30 MINLEN:50
 
-```
-//INSERT ADAPTERS TRIM 1
+```   
+![Image](/WES_Workflow/images/AdaptersTrim1.png "AT1")
 
 
-And so I did a second trimming pass with the TruSeqPE adapters as a referce adapter file and managed to eliminate a big portion of the adapters.
+
+And so I did a second trimming pass with the TruSeqPE adapters as a referce adapter file and managed to eliminate a big portion of the adapters. This did leave a small percentage of adapter content but FastQC report validated this as passable so I carried on with the analysis. 
 
 
 ```
@@ -51,7 +54,7 @@ forward_unparied.fastq.gz reverse_paired.fastq.gz reverse_upaired.fastq.gz \
 ILLUMINACLIP:/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:10:30 MINLEN:50
 
 ```
-//INSERT ADAPTERS TRIM 2
+![Image](/WES_Workflow/images/AT2.png "AT2")
 
 
 **Trimmomatic Options and Arguments**  
