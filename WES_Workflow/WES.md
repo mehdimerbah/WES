@@ -64,6 +64,9 @@ In running `trimmomatic` I used mainly 2 trimming options:
       
 `MINELN`: a minimum read length of 36 for all the reads after trimming. I chose to stick with 36 as a baseline minimum length so as not to eliminate possibly good reads.
 
+**Post-Trimming Stats**
+![Image of Stats](/WES_Workflow/images/PostTrimming.png "PostTrim")
+
 ### Read Mapping to Reference Chromosome
 We now can safely map our reads back into a reference genome, in our case we will b using Chromosome 7 of hg38. The chromosome fasta files had been concatinated.
 To use it the reference we have to index it using `bwa index` that uses the *Burrows Wheeler Transform* and *Smith Waterman* specified in the `-a` algorithm argument.    
@@ -186,7 +189,7 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 | Avg Mapping Quality| 25.5262 |
 | Number of Supplementary Reads | 670477 |
 | Number of Secondary Reads | 0 |
-| Number of Reads Without Pair Complement | |
+| Number of Reads Without Pair Complement | 58186023 |
 | Number of Duplicates | 1296614 |
 | Number of Reads with no Indels | 61300855 |
 | Number of INDELs | 7203 |
