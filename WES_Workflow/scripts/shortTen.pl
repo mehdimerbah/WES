@@ -29,7 +29,7 @@ while (<FASTQ>){
         }
     }
 }
-print $count;
+print join("\n ", @Ids);
 }
 
 
