@@ -1,5 +1,7 @@
-## Whole Exome Sequencing Project
+# Whole Exome Sequencing Project
+
 This project aims to construct a full pipeline for the identification and annotation of genetics variants given Paired End sequencing data: `392_1.fastq.gz` and `392_2.fastq.gz` as the forward and reverse reads respectively.
+
 ### Basic File Exploration
 From the file we could first notice that the file uses Phred33 character encoding for the quality scores and so we can conclude that the Illumina version used must be v 1.8 or later.
 
@@ -63,10 +65,6 @@ In running `trimmomatic` I used mainly 2 trimming options:
 - `simpleClipThreshold`: threshold for simple matching. usually between 7 and 15 are recommended so I took 10 as an average.
       
 `MINELN`: a minimum read length of 36 for all the reads after trimming. I chose to stick with 36 as a baseline minimum length so as not to eliminate possibly good reads.
-
-**Post-Trimming Stats**  
-We can see that the read lengths are no longer all 151. in accordance with our trimming arguments, minimum read length allowed is 36.  
-![Image of Stats](/WES_Workflow/images/PostTrimming.png "PostTrim")
 
 ### Read Mapping to Reference Chromosome
 We now can safely map our reads back into a reference genome, in our case we will b using Chromosome 7 of hg38. The chromosome fasta files had been concatinated.
@@ -190,8 +188,10 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 | Avg Mapping Quality| 25.5262 |
 | Number of Supplementary Reads | 670477 |
 | Number of Secondary Reads | 0 |
-| Number of Reads Without Pair Complement | 58186023 |
+| Number of Reads Without Pair Complement | |
 | Number of Duplicates | 1296614 |
 | Number of Reads with no Indels | 61300855 |
 | Number of INDELs | 7203 |
 | Number of SNPs | 122768 |
+
+
