@@ -172,7 +172,14 @@ gatk --java-options "-Xms5g -Xmx15g" SelectVariants -R /home/mohamed.mehdi/Whole
 
 ```
 
-<img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520">
+<img src="/WES_Workflow/images/Types_of_Variants_Excluded.pie.png"  width="520" height="520" class="center">
+
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+}
 
 
 
