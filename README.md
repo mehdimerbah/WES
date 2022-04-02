@@ -3,7 +3,7 @@
 Study for GEP Project [HCV-HIV](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0045200
 )
 ## Whole Exome Sequencing Project
-This project aims to construct a full pipeline for the identification and annotation of genetics variants given Paired End sequencing data: `392_1.fastq.gz` and `392_2.fastq.gz` as the forward and reverse reads respectively.
+This project aims to construct a full pipeline for the identification and annotation of genetic variants given Paired End sequencing data: `392_1.fastq.gz` and `392_2.fastq.gz` as the forward and reverse reads respectively.
 ### Basic File Exploration
 From the file we could first notice that the file uses Phred33 character encoding for the quality scores and so we can conclude that the Illumina version used must be v 1.8 or later.
 
